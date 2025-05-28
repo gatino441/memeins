@@ -11,6 +11,7 @@
       padding: 60px 10px 70px;
       background-color: #2b2d31;
       color: #e3e5e8;
+      overflow-x: hidden;
     }
     h2 {
       color: #f2f3f5;
@@ -18,7 +19,7 @@
     }
     #grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 12px;
       justify-items: center;
     }
@@ -41,6 +42,11 @@
       overflow-x: auto;
       white-space: nowrap;
       z-index: 1000;
+      scroll-behavior: smooth;
+      cursor: grab;
+    }
+    .pagination-bar:active {
+      cursor: grabbing;
     }
     .pagination-bar button {
       margin: 0 4px;
@@ -64,70 +70,46 @@
       background: #666;
       border-radius: 3px;
     }
-
-    /* Modal overlay */
-    #modalOverlay {
-      display: none;
+    .nav-buttons {
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(10,10,10,0.8);
-      z-index: 9999;
-      align-items: center;
-      justify-content: center;
-    }
-    #modalOverlay > div {
-      position: relative;
-      width: 90%;
-      max-width: 600px;
-      height: 80%;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
       background: #1e1f22;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+      z-index: 1001;
     }
-    #modalOverlay iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-    #modalOverlay button {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: #5865f2;
+    .nav-buttons button {
+      padding: 8px 16px;
+      background-color: #5865f2;
       color: white;
       border: none;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      font-size: 18px;
+      border-radius: 6px;
       cursor: pointer;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
 
 <h2>Instagram desde CSV</h2>
+<div class="nav-buttons">
+  <button onclick="goPrevious()">⟵ Atrás</button>
+  <button onclick="goNext()">Adelante ⟶</button>
+</div>
 <div id="grid"></div>
 <div class="pagination-bar" id="pagination"></div>
 
-<!-- Modal overlay -->
-<div id="modalOverlay">
-  <div>
-    <button onclick="closeModal()">×</button>
-    <iframe id="modalFrame" src=""></iframe>
-  </div>
-</div>
-
 <script>
   let allItems = [];
-  const itemsPerPage = 10;
+  const itemsPerPage = 12;
   let currentPage = 0;
 
   function renderPage(page) {
     currentPage = page;
-    localStorage.setItem('paginaActual', page);
+    localStorage.setItem('paginaActual_' + location.pathname, page);
 
     const grid = document.getElementById("grid");
     grid.innerHTML = "";
@@ -141,8 +123,8 @@
 
       const wrapper = document.createElement("div");
       wrapper.style.position = "relative";
-      wrapper.style.width = "400px";
-      wrapper.style.height = "405px";
+      wrapper.style.width = "350px";
+      wrapper.style.height = "381px";
       wrapper.style.background = "#111";
       wrapper.style.borderRadius = "2px";
       wrapper.style.overflow = "hidden";
@@ -156,16 +138,16 @@
       preview.style.height = "100%";
       preview.style.border = "none";
       preview.loading = "lazy";
+      preview.setAttribute('scrolling', 'no');
+      preview.style.overflow = 'hidden';
+
 
       wrapper.appendChild(preview);
       wrapper.style.cursor = "pointer";
       wrapper.title = "Haz clic para ampliar";
 
       wrapper.onclick = () => {
-        const modal = document.getElementById('modalOverlay');
-        const frame = document.getElementById('modalFrame');
-        frame.src = link;
-        modal.style.display = 'flex';
+        window.open(link, '_blank');
       };
 
       grid.appendChild(wrapper);
@@ -188,6 +170,21 @@
       btn.onclick = () => renderPage(i);
       pagination.appendChild(btn);
     }
+    const currentBtn = pagination.children[currentPage];
+    if (currentBtn) {
+      const bar = document.getElementById("pagination");
+      const scrollLeft = currentBtn.offsetLeft - bar.clientWidth / 2 + currentBtn.clientWidth / 2;
+      bar.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+    }
+  }
+
+  function goPrevious() {
+    if (currentPage > 0) renderPage(currentPage - 1);
+  }
+
+  function goNext() {
+    const totalPages = Math.ceil(allItems.length / itemsPerPage);
+    if (currentPage < totalPages - 1) renderPage(currentPage + 1);
   }
 
   function parseCSV(content) {
@@ -217,7 +214,7 @@
     })
     .then(content => {
       allItems = parseCSV(content);
-      const guardada = parseInt(localStorage.getItem('paginaActual'), 10);
+      const guardada = parseInt(localStorage.getItem('paginaActual_' + location.pathname), 10);
       const paginaInicial = (!isNaN(guardada) && guardada >= 0) ? guardada : 0;
       renderPage(paginaInicial);
     })
@@ -225,24 +222,39 @@
       document.body.innerHTML = "<p style='color: red; padding: 20px;'>Error al cargar resultados.csv: " + err.message + "</p>";
     });
 
-  // Modal para abrir enlaces en overlay
-  function closeModal() {
-    document.getElementById('modalOverlay').style.display = 'none';
-    document.getElementById('modalFrame').src = '';
-  }
+  // Scroll horizontal con rueda del mouse
+  const pagination = document.getElementById("pagination");
+  pagination.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    pagination.scrollLeft += e.deltaY*3;
+  });
 
-  document.addEventListener('click', function (e) {
-    const target = e.target.closest('a');
-    if (target && target.getAttribute('target') === '_blank') {
-      e.preventDefault();
-      const url = target.href;
-      const modal = document.getElementById('modalOverlay');
-      const frame = document.getElementById('modalFrame');
-      frame.src = url;
-      modal.style.display = 'flex';
-    }
+  // Arrastre con el mouse
+  let isDown = false;
+  let startX;
+  let scrollLeft;
+
+  pagination.addEventListener('mousedown', (e) => {
+    isDown = true;
+    pagination.classList.add('active');
+    startX = e.pageX - pagination.offsetLeft;
+    scrollLeft = pagination.scrollLeft;
+  });
+  pagination.addEventListener('mouseleave', () => {
+    isDown = false;
+    pagination.classList.remove('active');
+  });
+  pagination.addEventListener('mouseup', () => {
+    isDown = false;
+    pagination.classList.remove('active');
+  });
+  pagination.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - pagination.offsetLeft;
+    const walk = (x - startX) * 2;
+    pagination.scrollLeft = scrollLeft - walk;
   });
 </script>
-
 </body>
 </html>
