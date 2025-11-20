@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Instagram desde CSVzzzzz</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 60px 10px 70px;
+      background-color: #2b2d31;
+      color: #e3e5e8;
+      overflow-x: hidden;
+    }
+    h2 {
+      color: #f2f3f5;
+      text-align: center;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 12px;
+      justify-items: center;
+    }
+    iframe {
+      width: 250px;
+      height: 300px;
+      border: none;
+      border-radius: 6px;
+      background-color: #1e1f22;
+    }
+    .pagination-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1e1f22;
+      border-top: 1px solid #444;
+      padding: 8px 10px;
+      display: flex;
+      overflow-x: auto;
+      white-space: nowrap;
+      z-index: 1000;
+      scroll-behavior: smooth;
+      cursor: grab;
+    }
+    .pagination-bar:active {
+      cursor: grabbing;
+    }
+    .pagination-bar button {
+      margin: 0 4px;
+      padding: 6px 12px;
+      background-color: #383a40;
+      border: none;
+      border-radius: 4px;
+      color: #e3e5e8;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .pagination-bar button.active {
+      background-color: #5865f2;
+      color: white;
+      font-weight: bold;
+    }
+    .pagination-bar::-webkit-scrollbar {
+      height: 6px;
+    }
+    .pagination-bar::-webkit-scrollbar-thumb {
+      background: #666;
+      border-radius: 3px;
+    }
+    .nav-buttons {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      background: #1e1f22;
+      z-index: 1001;
+    }
+    .nav-buttons button {
+      padding: 8px 16px;
+      background-color: #5865f2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Instagram desde CSV</h2>
+<div class="nav-buttons">
+  <button onclick="goPrevious()">⟵ Atrás</button>
+  <button onclick="goNext()">Adelante ⟶</button>
+</div>
+<div id="grid"></div>
+<div class="pagination-bar" id="pagination"></div>
+
+<script>
+  let allItems = [];
+  const itemsPerPage = 24;
+  let currentPage = 0;
+  let omitidos = [];
+
+  function guardarOmitidoCSV(usuario) {
+    omitidos.push(usuario);
+    const csv = "texto\n" + omitidos.join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "omitidos.csv";
+    link.click();
+  }
+
+  function renderPage(page) {
+    currentPage = page;
+    localStorage.setItem('paginaActual_' + location.pathname, page);
+
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+
+    const start = page * itemsPerPage;
+    const end = Math.min(start + itemsPerPage, allItems.length);
+
+    for (let i = start; i < end; i++) {
+      const item = allItems[i];
+      const link = `https://www.instagram.com/${encodeURIComponent(item.texto)}/`;
+
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "350px";
+      wrapper.style.height = "381px";
+      wrapper.style.background = "#111";
+      wrapper.style.borderRadius = "2px";
+      wrapper.style.overflow = "hidden";
+      wrapper.style.display = "flex";
+      wrapper.style.alignItems = "center";
+      wrapper.style.justifyContent = "center";
+      wrapper.style.cursor = "pointer";
+
+      const preview = document.createElement("iframe");
+      preview.src = `${link}embed`;
+      preview.style.width = "100%";
+      preview.style.height = "100%";
+      preview.style.border = "none";
+
+      preview.onload = () => {
+        try {
+          const iframeDoc = preview.contentDocument || preview.contentWindow.document;
+          if (iframeDoc.body.innerText.includes("Es posible que el enlace a este perfil")) {
+            guardarOmitidoCSV(item.texto);
+            wrapper.remove();
+            return;
+          }
+        } catch {}
+      };
+
+      wrapper.onclick = () => window.open(link, '_blank');
+
+      wrapper.appendChild(preview);
+      grid.appendChild(wrapper);
+    }
+
+    renderPagination();
+  }
+
+  function renderPagination() {
+    const pagination = document.getElementById("pagination");
+    pagination.innerHTML = "";
+
+    const totalPages = Math.ceil(allItems.length / itemsPerPage);
+
+    for (let i = 0; i < totalPages; i++) {
+      const btn = document.createElement("button");
+      btn.textContent = i + 1;
+      if (i === currentPage) btn.classList.add("active");
+      btn.onclick = () => renderPage(i);
+      pagination.appendChild(btn);
+    }
+  }
+
+  function parseCSV(text) {
+    const lines = text.trim().split("\n");
+    const header = lines[0].split(",");
+    const textIndex = header.indexOf("texto");
+    const items = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",");
+      if (cols[textIndex]) items.push({ texto: cols[textIndex].trim() });
+    }
+    return items;
+  }
+
+  // ✅ DETECTA SI SE ESTÁ ABRIENDO COMO FILE://
+  const esLocal = location.protocol === "file:";
+
+  if (esLocal) {
+    // ✅ Muestra un input para subir el CSV manualmente
+    document.body.innerHTML = `
+      <h2 style="text-align:center;">Cargar CSV manualmente</h2>
+      <input type="file" id="fileInput" accept=".csv" style="display:block; margin:20px auto; padding:10px;">
+      <div id="grid"></div>
+      <div class="pagination-bar" id="pagination"></div>
+    `;
+
+    document.getElementById("fileInput").onchange = function(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        allItems = parseCSV(evt.target.result);
+        renderPage(0);
+      };
+      reader.readAsText(file);
+    };
+
+  } else {
+    // ✅ Si está en servidor → fetch funciona
+    fetch("resultado__funkinas.csv")
+      .then(r => r.text())
+      .then(c => {
+        allItems = parseCSV(c);
+        renderPage(0);
+      })
+      .catch(() => {
+        document.body.innerHTML = `<p style="color:red; padding:20px;">Error cargando CSV</p>`;
+      });
+  }
+
+</script>
+
+
+</body>
+</html>
