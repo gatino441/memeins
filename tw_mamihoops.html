@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Instagram desde CSVzzzzz</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 60px 10px 70px;
+      background-color: #2b2d31;
+      color: #e3e5e8;
+      overflow-x: hidden;
+    }
+    h2 {
+      color: #f2f3f5;
+      text-align: center;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 12px;
+      justify-items: center;
+    }
+    iframe {
+      width: 250px;
+      height: 300px;
+      border: none;
+      border-radius: 6px;
+      background-color: #1e1f22;
+    }
+    .pagination-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1e1f22;
+      border-top: 1px solid #444;
+      padding: 8px 10px;
+      display: flex;
+      overflow-x: auto;
+      white-space: nowrap;
+      z-index: 1000;
+      scroll-behavior: smooth;
+      cursor: grab;
+    }
+    .pagination-bar:active {
+      cursor: grabbing;
+    }
+    .pagination-bar button {
+      margin: 0 4px;
+      padding: 6px 12px;
+      background-color: #383a40;
+      border: none;
+      border-radius: 4px;
+      color: #e3e5e8;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .pagination-bar button.active {
+      background-color: #5865f2;
+      color: white;
+      font-weight: bold;
+    }
+    .pagination-bar::-webkit-scrollbar {
+      height: 6px;
+    }
+    .pagination-bar::-webkit-scrollbar-thumb {
+      background: #666;
+      border-radius: 3px;
+    }
+    .nav-buttons {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      background: #1e1f22;
+      z-index: 1001;
+    }
+    .nav-buttons button {
+      padding: 8px 16px;
+      background-color: #5865f2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Instagram desde CSV</h2>
+<div class="nav-buttons">
+  <button onclick="goPrevious()">⟵ Atrás</button>
+  <button onclick="goNext()">Adelante ⟶</button>
+</div>
+<div id="grid"></div>
+<div class="pagination-bar" id="pagination"></div>
+
+<script>
+  let allItems = [];
+  const itemsPerPage = 24;
+  let currentPage = 0;
+
+  function renderPage(page) {
+    currentPage = page;
+    localStorage.setItem('paginaActual_' + location.pathname, page);
+
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+
+    const start = page * itemsPerPage;
+    const end = Math.min(start + itemsPerPage, allItems.length);
+
+    for (let i = start; i < end; i++) {
+      const item = allItems[i];
+      const link = `https://www.instagram.com/${encodeURIComponent(item.texto)}/`;
+
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "relative";
+      wrapper.style.width = "350px";
+      wrapper.style.height = "381px";
+      wrapper.style.background = "#111";
+      wrapper.style.borderRadius = "2px";
+      wrapper.style.overflow = "hidden";
+      wrapper.style.display = "flex";
+      wrapper.style.alignItems = "center";
+      wrapper.style.justifyContent = "center";
+
+      const preview = document.createElement("iframe");
+      preview.src = `${link}embed`;
+      preview.style.width = "100%";
+      preview.style.height = "100%";
+      preview.style.border = "none";
+      preview.loading = "lazy";
+      preview.setAttribute('scrolling', 'no');
+      preview.style.overflow = 'hidden';
+
+
+      wrapper.appendChild(preview);
+      wrapper.style.cursor = "pointer";
+      wrapper.title = "Haz clic para ampliar";
+
+      wrapper.onclick = () => {
+        window.open(link, '_blank');
+      };
+
+      grid.appendChild(wrapper);
+    }
+
+    renderPagination();
+  }
+
+  function renderPagination() {
+    const pagination = document.getElementById("pagination");
+    pagination.innerHTML = "";
+
+    const totalPages = Math.ceil(allItems.length / itemsPerPage);
+    for (let i = 0; i < totalPages; i++) {
+      const btn = document.createElement("button");
+      btn.textContent = i + 1;
+      if (i === currentPage) {
+        btn.classList.add("active");
+      }
+      btn.onclick = () => renderPage(i);
+      pagination.appendChild(btn);
+    }
+    const currentBtn = pagination.children[currentPage];
+    if (currentBtn) {
+      const bar = document.getElementById("pagination");
+      const scrollLeft = currentBtn.offsetLeft - bar.clientWidth / 2 + currentBtn.clientWidth / 2;
+      bar.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+    }
+  }
+
+  function goPrevious() {
+    if (currentPage > 0) renderPage(currentPage - 1);
+  }
+
+  function goNext() {
+    const totalPages = Math.ceil(allItems.length / itemsPerPage);
+    if (currentPage < totalPages - 1) renderPage(currentPage + 1);
+  }
+
+  function parseCSV(content) {
+    const lines = content.trim().split("\n");
+    const items = [];
+    const header = lines[0].split(",");
+    const textIndex = header.indexOf("texto");
+    if (textIndex === -1) {
+      alert("El CSV debe tener una columna llamada 'texto'");
+      return [];
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",");
+      if (cols.length > textIndex) {
+        const texto = cols[textIndex].trim();
+        if (texto) items.push({ texto });
+      }
+    }
+    return items;
+  }
+
+  fetch("resultado_mamihoops.csv")
+    .then(response => {
+      if (!response.ok) throw new Error("No se pudo cargar resultados.csv");
+      return response.text();
+    })
+    .then(content => {
+      allItems = parseCSV(content);
+      const guardada = parseInt(localStorage.getItem('paginaActual_' + location.pathname), 10);
+      const paginaInicial = (!isNaN(guardada) && guardada >= 0) ? guardada : 0;
+      renderPage(paginaInicial);
+    })
+    .catch(err => {
+      document.body.innerHTML = "<p style='color: red; padding: 20px;'>Error al cargar resultados.csv: " + err.message + "</p>";
+    });
+
+  // Scroll horizontal con rueda del mouse
+  const pagination = document.getElementById("pagination");
+  pagination.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    pagination.scrollLeft += e.deltaY*3;
+  });
+
+  // Arrastre con el mouse
+  let isDown = false;
+  let startX;
+  let scrollLeft;
+
+  pagination.addEventListener('mousedown', (e) => {
+    isDown = true;
+    pagination.classList.add('active');
+    startX = e.pageX - pagination.offsetLeft;
+    scrollLeft = pagination.scrollLeft;
+  });
+  pagination.addEventListener('mouseleave', () => {
+    isDown = false;
+    pagination.classList.remove('active');
+  });
+  pagination.addEventListener('mouseup', () => {
+    isDown = false;
+    pagination.classList.remove('active');
+  });
+  pagination.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - pagination.offsetLeft;
+    const walk = (x - startX) * 2;
+    pagination.scrollLeft = scrollLeft - walk;
+  });
+</script>
+</body>
+</html>
