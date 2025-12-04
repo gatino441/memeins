@@ -207,7 +207,7 @@
     return items;
   }
 
-  fetch("resultado_mamihoops.csv")
+  fetch("resultados_mamihoops.csv")
     .then(response => {
       if (!response.ok) throw new Error("No se pudo cargar resultados.csv");
       return response.text();
@@ -258,3 +258,4 @@
 </script>
 </body>
 </html>
+
